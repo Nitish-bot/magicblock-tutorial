@@ -6,7 +6,7 @@ import {
   type TransactionSigner,
 } from "@solana/kit";
 import { describe, it, expect, beforeAll } from "bun:test";
-import { 
+import {
   TE_PROGRAM_ADDRESS,
   COUNTER_DISCRIMINATOR,
   getCounterDecoder,

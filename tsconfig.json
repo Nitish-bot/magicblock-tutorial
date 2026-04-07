@@ -25,7 +25,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
-    
+
     "baseUrl": ".",
     "paths": {
       "@client/*": ["app/client/src/generated/*"]
