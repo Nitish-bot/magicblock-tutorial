@@ -5,9 +5,7 @@ pub mod state;
 
 use anchor_lang::prelude::*;
 
-pub use constants::*;
 pub use instructions::*;
-pub use state::*;
 
 declare_id!("9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y");
 
@@ -15,7 +13,19 @@ declare_id!("9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y");
 pub mod magicblock_tutorial {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        initialize::handler(ctx)
+    pub fn create_game(ctx: Context<CreateGame>) -> Result<()> {
+        create_game::handler(ctx)
+    }
+
+    pub fn join_game(ctx: Context<JoinGame>) -> Result<()> {
+        join_game::handler(ctx)
+    }
+    
+    pub fn make_choice(ctx: Context<MakeChoice>) -> Result<()> {
+        make_choice::handler(ctx)
+    }
+    
+    pub fn reveal_winner(ctx: Context<RevealWinner>) -> Result<()> {
+        reveal_winner::handler(ctx)
     }
 }
