@@ -1,18 +1,18 @@
 [toolchain]
-package_manager = "yarn"
+package_manager = "bun"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-magicblock_tutorial = "9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y"
+magicblock_tutorial = "H121vCEEaieHhrtdCNrs3DhtjrVptuJaxKKvaYy92Ttv"
 
 [provider]
 cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "cargo test"
+test = "bun test --timeout 1000000 tests/*.test.ts"
 
 [hooks]
