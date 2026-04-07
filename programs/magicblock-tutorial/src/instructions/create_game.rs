@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::{GAME_SEED, PLAYER_CHOICE_SEED},
-    state::{Game, GameResult, PlayerChoice},
+    state::{Game, GameResult, GameState, PlayerChoice},
 };
 
 #[derive(Accounts)]
@@ -39,6 +39,7 @@ pub fn handler(ctx: Context<CreateGame>, game_id: u64) -> Result<()> {
         game_id,
         player1: player_key,
         player2: None,
+        state: GameState::AwaitingPlayerTwo,
         result: GameResult::None,
     });
 

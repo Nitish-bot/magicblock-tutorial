@@ -6,6 +6,7 @@ pub struct Game {
     pub game_id: u64,
     pub player1: Pubkey,
     pub player2: Option<Pubkey>,
+    pub state: GameState,
     pub result: GameResult,
 }
 
@@ -17,6 +18,14 @@ pub struct PlayerChoice {
     pub choice: Option<Choice>,
 }
 
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
+pub enum GameState {
+    AwaitingPlayerTwo,
+    AwaitingFirstChoice,
+    AwaitingSecondChoice,
+    GameFinished,
+    WinnerDeclared,
+}
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum GameResult {
     Winner(GameData),
@@ -31,9 +40,41 @@ pub struct GameData {
     pub winner: Pubkey,
 }
 
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone)]
+#[derive(InitSpace, AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum Choice {
     Rock,
     Paper,
     Scissors,
+}
+
+impl Choice {
+    pub fn beats(&self, opponent: &Self) -> Option<bool> {
+        if self == opponent {
+            return None;
+        }
+
+        match self {
+            Self::Rock => {
+                if opponent == &Self::Scissors {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            }
+            Self::Paper => {
+                if opponent == &Self::Rock {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            }
+            Self::Scissors => {
+                if opponent == &Self::Paper {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            }
+        }
+    }
 }
