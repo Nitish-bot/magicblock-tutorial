@@ -4,14 +4,19 @@ pub mod constants;
 pub mod error;
 pub mod instructions;
 pub mod state;
+pub mod utils;
 
 use anchor_lang::prelude::*;
+use ephemeral_rollups_sdk::anchor::ephemeral;
+use ephemeral_rollups_sdk::access_control::structs::Member;
 
 pub use instructions::*;
 pub use state::Choice;
+pub use utils::AccountType;
 
 declare_id!("9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y");
 
+// #[ephemeral]
 #[program]
 pub mod magicblock_tutorial {
 
@@ -32,4 +37,8 @@ pub mod magicblock_tutorial {
     pub fn reveal_winner(ctx: Context<RevealWinner>) -> Result<()> {
         reveal_winner::handler(ctx)
     }
+
+    // pub fn create_permission(ctx: Context<CreatePermission>, account_type: AccountType, members: Option<Vec<Member>>) {
+    //     create_permission::handler(ctx, account_type, members)
+    // }
 }

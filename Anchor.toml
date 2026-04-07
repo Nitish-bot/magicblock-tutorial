@@ -1,9 +1,13 @@
 [toolchain]
 package_manager = "bun"
+anchor_version = "0.32.1"
 
 [features]
 resolution = true
 skip-lint = false
+
+[registry]
+url = "https://api.apr.dev"
 
 [programs.localnet]
 magicblock_tutorial = "H121vCEEaieHhrtdCNrs3DhtjrVptuJaxKKvaYy92Ttv"
