@@ -16,10 +16,9 @@ pub use utils::AccountType;
 
 declare_id!("9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y");
 
-// #[ephemeral]
+#[ephemeral]
 #[program]
 pub mod magicblock_tutorial {
-
     use super::*;
 
     pub fn create_game(ctx: Context<CreateGame>, game_id: u64) -> Result<()> {
@@ -38,7 +37,7 @@ pub mod magicblock_tutorial {
         reveal_winner::handler(ctx)
     }
 
-    // pub fn create_permission(ctx: Context<CreatePermission>, account_type: AccountType, members: Option<Vec<Member>>) {
-    //     create_permission::handler(ctx, account_type, members)
-    // }
+    pub fn create_permission(ctx: Context<CreatePermission>, account_type: AccountType, members: Option<Vec<Member>>) -> Result<()> {
+        create_permission::handler(ctx, account_type, members)
+    }
 }

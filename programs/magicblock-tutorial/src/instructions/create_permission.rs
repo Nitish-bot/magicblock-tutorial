@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
-use ephemeral_rollups_sdk::anchor::ephemeral;
+use ephemeral_rollups_sdk::access_control::instructions::CreatePermissionCpiBuilder;
+use ephemeral_rollups_sdk::access_control::structs::{Member, MembersArgs};
 use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
 
-use crate::constants::{GAME_SEED, PLAYER_CHOICE_SEED};
+use crate::AccountType;
+use crate::utils::derive_seeds_from_account_type;
 
 #[derive(Accounts)]
 pub struct CreatePermission<'info> {
