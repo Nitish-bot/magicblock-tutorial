@@ -101,8 +101,8 @@ pub fn handler(ctx: Context<RevealWinner>) -> Result<()> {
     
     let player1_seeds: &[&[&[u8]]] = &[&[
         PLAYER_CHOICE_SEED,
-        &player1_choice.game_id.to_le_bytes(),
         player1_choice.player.as_ref(),
+        &player1_choice.game_id.to_le_bytes(),
         &[ctx.bumps.player1_choice]
     ]];
     UpdatePermissionCpiBuilder::new(&permission_program)
@@ -114,8 +114,8 @@ pub fn handler(ctx: Context<RevealWinner>) -> Result<()> {
     
     let player2_seeds: &[&[&[u8]]] = &[&[
         PLAYER_CHOICE_SEED,
-        &player2_choice.game_id.to_le_bytes(),
         player2_choice.player.as_ref(),
+        &player2_choice.game_id.to_le_bytes(),
         &[ctx.bumps.player2_choice]
     ]];
     UpdatePermissionCpiBuilder::new(&permission_program)
