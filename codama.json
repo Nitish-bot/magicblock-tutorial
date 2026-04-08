@@ -1,5 +1,5 @@
 {
-  "idl": "./target/idl/te.json",
+  "idl": "./target/idl/magicblock_tutorial.json",
   "scripts": {
     "js": [
       {
