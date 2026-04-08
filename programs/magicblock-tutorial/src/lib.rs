@@ -14,7 +14,7 @@ pub use instructions::*;
 pub use state::Choice;
 pub use utils::AccountType;
 
-declare_id!("9oiti6VtiPXPbhSSvFHgZZDomp7SzD8Jd3JvEbcZXW4y");
+declare_id!("Bv4p1TKzfmuUzZDmVCe2KzmY65ShCj7xbZn2Uc8qSxQv");
 
 #[ephemeral]
 #[program]
@@ -39,5 +39,9 @@ pub mod magicblock_tutorial {
 
     pub fn create_permission(ctx: Context<CreatePermission>, account_type: AccountType, members: Option<Vec<Member>>) -> Result<()> {
         create_permission::handler(ctx, account_type, members)
+    }
+    
+    pub fn delegate_pda(ctx: Context<DelegatePda>, account_type: AccountType) -> Result<()> {
+        delegate_pda::handler(ctx, account_type)
     }
 }

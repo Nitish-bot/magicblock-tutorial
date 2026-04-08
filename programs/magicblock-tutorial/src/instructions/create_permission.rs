@@ -40,15 +40,14 @@ pub fn handler(
         system_program,
     } = ctx.accounts;
 
-    let seed_data = derive_seeds_from_account_type(&account_type);
+    let mut seeds = derive_seeds_from_account_type(&account_type);
 
     let (_, bump) = Pubkey::find_program_address(
-        &seed_data.iter().map(|s| s.as_slice()).collect::<Vec<_>>(),
+        &seeds.iter().map(|s| s.as_slice()).collect::<Vec<_>>(),
         &crate::ID,
     );
-
-    let mut seeds = seed_data.clone();
     seeds.push(vec![bump]);
+
     let seed_refs: Vec<&[u8]> = seeds.iter().map(|s| s.as_slice()).collect();
 
     CreatePermissionCpiBuilder::new(&permission_program)

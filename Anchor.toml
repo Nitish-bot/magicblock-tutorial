@@ -1,22 +1,20 @@
 [toolchain]
-package_manager = "bun"
 anchor_version = "0.32.1"
+package_manager = "bun"
 
 [features]
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+magicblock_tutorial = "Bv4p1TKzfmuUzZDmVCe2KzmY65ShCj7xbZn2Uc8qSxQv"
+
 [registry]
 url = "https://api.apr.dev"
 
-[programs.localnet]
-magicblock_tutorial = "H121vCEEaieHhrtdCNrs3DhtjrVptuJaxKKvaYy92Ttv"
-
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "bun test --timeout 1000000 tests/*.test.ts"
-
-[hooks]
