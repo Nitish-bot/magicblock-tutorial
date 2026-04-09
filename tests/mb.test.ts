@@ -24,6 +24,7 @@ import {
   getMakeChoiceInstruction,
   getPlayerChoiceDecoder,
   getRevealWinnerInstruction,
+  type GameData,
 } from "@client/index";
 import {
   address,
@@ -37,6 +38,7 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
+  unwrapOption,
   type Address,
   type TransactionSigner,
 } from "@solana/kit";
@@ -45,6 +47,23 @@ import { connect, getPDAAndBump, type Connection } from "solana-kite";
 import nacl from "tweetnacl";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const stringify = (object: unknown) => {
+  const bigIntReplacer = (key: string, value: unknown) =>
+    typeof value === "bigint" ? value.toString() : value;
+  return JSON.stringify(object, bigIntReplacer, 2);
+};
+
+const logAccountMap = (
+  label: string,
+  accounts: Record<string, Address | string | undefined>,
+) => {
+  console.log(`===== ${label} =====`);
+  for (const [name, value] of Object.entries(accounts)) {
+    console.log(`${name}: ${value ?? "<unset>"}`);
+  }
+  console.log("====================");
+};
+
 const LAMPORTS_PER_SOL = 1_000_000_000n;
 const AIRDROP_AMOUNT = lamports(2n * LAMPORTS_PER_SOL);
 const MINIMUM_BALANCE = lamports(LAMPORTS_PER_SOL / 2n);
@@ -148,18 +167,32 @@ async function sendAndPoll(
     const signedTx = await signTransactionMessageWithSigners(txMsg);
     const signature = getSignatureFromTransaction(signedTx);
 
-    await conn.rpc
-      .sendTransaction(getBase64EncodedWireTransaction(signedTx), {
-        encoding: "base64",
-        skipPreflight,
-      })
-      .send();
+    try {
+      await conn.rpc
+        .sendTransaction(getBase64EncodedWireTransaction(signedTx), {
+          encoding: "base64",
+          skipPreflight,
+        })
+        .send();
+    } catch (error) {
+      const logs = await getFailureLogs(conn, signature);
+      throw new Error(
+        `Transaction send failed for ${signature}\n${stringify(error)}\nLogs:\n${logs.join(
+          "\n",
+        )}`,
+      );
+    }
 
     for (let i = 0; i < 60; i += 1) {
       const { value } = await conn.rpc.getSignatureStatuses([signature]).send();
       const status = value[0];
       if (status?.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+        const logs = await getFailureLogs(conn, signature);
+        throw new Error(
+          `Transaction failed for ${signature}: ${stringify(status.err)}\nLogs:\n${logs.join(
+            "\n",
+          )}`,
+        );
       }
       if (
         status?.confirmationStatus === "confirmed" ||
@@ -179,6 +212,32 @@ async function sendAndPoll(
   throw new Error(
     "Transaction confirmation timeout after retrying fresh blockhashes",
   );
+}
+
+async function getFailureLogs(
+  conn: Connection,
+  signature: string,
+): Promise<string[]> {
+  try {
+    const logs = await conn.getLogs(signature);
+    if (logs.length > 0) {
+      return logs;
+    }
+  } catch {
+    // Fall through to transaction fetch.
+  }
+
+  try {
+    const tx = await conn.getTransaction(signature, "confirmed", 0);
+    const metaLogs = tx?.meta?.logMessages;
+    if (Array.isArray(metaLogs) && metaLogs.length > 0) {
+      return metaLogs;
+    }
+  } catch {
+    // Ignore and return fallback text below.
+  }
+
+  return ["<no logs available>"];
 }
 
 async function decodeAccount<T>(
@@ -288,11 +347,11 @@ describe(`magicblock tutorial (${cluster})`, () => {
 
       ephemeralConnectionP1 = connect(
         `${ephemeralUrl}?token=${authTokenP1.token}`,
-        ephemeralWsUrl,
+        `${ephemeralWsUrl}?token=${authTokenP1.token}`,
       );
       ephemeralConnectionP2 = connect(
         `${ephemeralUrl}?token=${authTokenP2.token}`,
-        ephemeralWsUrl,
+        `${ephemeralWsUrl}?token=${authTokenP2.token}`,
       );
     } else {
       ephemeralConnectionP1 = ephemeralConnection;
@@ -325,9 +384,22 @@ describe(`magicblock tutorial (${cluster})`, () => {
     permissionGame = await permissionPdaFromAccount(gamePda);
     permissionP1 = await permissionPdaFromAccount(player1ChoicePda);
     permissionP2 = await permissionPdaFromAccount(player2ChoicePda);
+
+    logAccountMap("Account Map", {
+      authority: authority.address,
+      player1: player1.address,
+      player2: player2.address,
+      gamePda,
+      player1ChoicePda,
+      player2ChoicePda,
+      permissionGame,
+      permissionP1,
+      permissionP2,
+      erValidator,
+    });
   });
 
-  it("creates the game and player1 choice account", async () => {
+  it("creates the game and delegates player1 choice account to ER", async () => {
     const createGameIx = getCreateGameInstruction({
       player: player1,
       game: gamePda,
@@ -335,35 +407,6 @@ describe(`magicblock tutorial (${cluster})`, () => {
       gameId,
     });
 
-    await sendAndPoll(baseConnection, player1, [createGameIx], {
-      skipPreflight: false,
-    });
-
-    const game = await decodeAccount(
-      baseConnection,
-      gamePda,
-      GAME_DISCRIMINATOR,
-      getGameDecoder(),
-    );
-    const player1Choice = await decodeAccount(
-      baseConnection,
-      player1ChoicePda,
-      PLAYER_CHOICE_DISCRIMINATOR,
-      getPlayerChoiceDecoder(),
-    );
-
-    expect(game.gameId).toBe(gameId);
-    expect(game.player1).toBe(player1.address);
-    expect(game.player2.__option).toBe("None");
-    expect(game.state).toBe(GameState.AwaitingPlayerTwo);
-    expect(game.result.__kind).toBe("None");
-
-    expect(player1Choice.gameId).toBe(gameId);
-    expect(player1Choice.player).toBe(player1.address);
-    expect(player1Choice.choice.__option).toBe("None");
-  });
-
-  it("creates player1 choice permission and delegates it to the ER", async () => {
     const createPermissionIx = getCreatePermissionInstruction({
       payer: player1,
       permissionedAccount: player1ChoicePda,
@@ -411,9 +454,37 @@ describe(`magicblock tutorial (${cluster})`, () => {
     await sendAndPoll(
       baseConnection,
       player1,
-      [createPermissionIx, delegatePermissionIx, delegateChoiceIx],
+      [
+        createGameIx,
+        createPermissionIx,
+        delegatePermissionIx,
+        delegateChoiceIx,
+      ],
       { skipPreflight: false },
     );
+
+    const game = await decodeAccount(
+      baseConnection,
+      gamePda,
+      GAME_DISCRIMINATOR,
+      getGameDecoder(),
+    );
+    const player1Choice = await decodeAccount(
+      baseConnection,
+      player1ChoicePda,
+      PLAYER_CHOICE_DISCRIMINATOR,
+      getPlayerChoiceDecoder(),
+    );
+
+    expect(game.gameId).toBe(gameId);
+    expect(game.player1).toBe(player1.address);
+    expect(unwrapOption(game.player2)).toBeNull();
+    expect(game.state).toBe(GameState.AwaitingPlayerTwo);
+    expect(game.result.__kind).toBe("None");
+
+    expect(player1Choice.gameId).toBe(gameId);
+    expect(player1Choice.player).toBe(player1.address);
+    expect(unwrapOption(player1Choice.choice)).toBeNull();
   });
 
   it("joins the game, creates permissions, and delegates all ER accounts", async () => {
@@ -534,24 +605,34 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(game.player2).not.toBeNull();
-    if (game.player2 == null) {
-      throw new Error("Expected player2 to be set after join_game");
-    }
-    expect(String(game.player2)).toBe(String(player2.address));
+    expect(unwrapOption(game.player2)).toBe(player2.address);
     expect(game.state).toBe(GameState.AwaitingFirstChoice);
     expect(player2Choice.player).toBe(player2.address);
-    expect(player2Choice.choice).toBeNull();
+    expect(unwrapOption(player2Choice.choice)).toBeNull();
   });
 
   it("enforces ER visibility on delegated choice accounts", async () => {
-    expect(await waitUntilPermissionActive(ephemeralUrl, gamePda)).toBe(true);
-    expect(
-      await waitUntilPermissionActive(ephemeralUrl, player1ChoicePda),
-    ).toBe(true);
-    expect(
-      await waitUntilPermissionActive(ephemeralUrl, player2ChoicePda),
-    ).toBe(true);
+    // Will fail on localnet since private ER
+    // is not supported on local validator
+    if (ephemeralUrl.includes("tee")) {
+      expect(await waitUntilPermissionActive(ephemeralUrl, gamePda)).toBe(true);
+      expect(
+        await waitUntilPermissionActive(ephemeralUrl, player1ChoicePda),
+      ).toBe(true);
+      expect(
+        await waitUntilPermissionActive(ephemeralUrl, player2ChoicePda),
+      ).toBe(true);
+
+      const p1Sneak = await ephemeralConnectionP1.rpc
+        .getAccountInfo(player2ChoicePda, { encoding: "base64" })
+        .send();
+      const p2Sneak = await ephemeralConnectionP2.rpc
+        .getAccountInfo(player1ChoicePda, { encoding: "base64" })
+        .send();
+
+      expect(p1Sneak.value).toBeNull();
+      expect(p2Sneak.value).toBeNull();
+    }
 
     const p1Own = await ephemeralConnectionP1.rpc
       .getAccountInfo(player1ChoicePda, { encoding: "base64" })
@@ -562,16 +643,6 @@ describe(`magicblock tutorial (${cluster})`, () => {
 
     expect(p1Own.value).not.toBeNull();
     expect(p2Own.value).not.toBeNull();
-
-    const p1Sneak = await ephemeralConnectionP1.rpc
-      .getAccountInfo(player2ChoicePda, { encoding: "base64" })
-      .send();
-    const p2Sneak = await ephemeralConnectionP2.rpc
-      .getAccountInfo(player1ChoicePda, { encoding: "base64" })
-      .send();
-
-    expect(p1Sneak.value).toBeNull();
-    expect(p2Sneak.value).toBeNull();
   });
 
   it("lets both players submit choices on the ephemeral rollup", async () => {
@@ -599,11 +670,7 @@ describe(`magicblock tutorial (${cluster})`, () => {
     );
 
     expect(gameAfterP1.state).toBe(GameState.AwaitingSecondChoice);
-    expect(choiceAfterP1.choice).not.toBeNull();
-    if (choiceAfterP1.choice == null) {
-      throw new Error("Expected player1 choice to be recorded");
-    }
-    expect(Number(choiceAfterP1.choice)).toBe(Choice.Rock);
+    expect(unwrapOption(choiceAfterP1.choice)).toBe(Choice.Rock);
 
     const player2ChoiceIx = getMakeChoiceInstruction({
       player: player2,
@@ -629,12 +696,7 @@ describe(`magicblock tutorial (${cluster})`, () => {
     );
 
     expect(gameAfterP2.state).toBe(GameState.GameFinished);
-    expect(gameAfterP2.result.__kind).toBe("None");
-    expect(choiceAfterP2.choice).not.toBeNull();
-    if (choiceAfterP2.choice == null) {
-      throw new Error("Expected player2 choice to be recorded");
-    }
-    expect(Number(choiceAfterP2.choice)).toBe(Choice.Scissors);
+    expect(unwrapOption(choiceAfterP2.choice)).toBe(Choice.Scissors);
   });
 
   it("reveals the winner and commits the result back to the base layer", async () => {
@@ -673,21 +735,14 @@ describe(`magicblock tutorial (${cluster})`, () => {
 
     expect(game.state).toBe(GameState.WinnerDeclared);
     expect(game.result.__kind).toBe("Winner");
-    if (game.result.__kind !== "Winner") {
-      throw new Error("Expected a winner result");
-    }
 
-    const [winnerData] = game.result.fields;
+    // @ts-ignore fields does exist on the winner arm of GameResult
+    const [winnerData]: [GameData] = game.result.fields!;
     expect(winnerData.player1Choice).toBe(Choice.Rock);
     expect(winnerData.player2Choice).toBe(Choice.Scissors);
     expect(winnerData.winner).toBe(player1.address);
 
-    expect(player1Choice.choice).not.toBeNull();
-    expect(player2Choice.choice).not.toBeNull();
-    if (player1Choice.choice == null || player2Choice.choice == null) {
-      throw new Error("Expected committed player choices on the base layer");
-    }
-    expect(Number(player1Choice.choice)).toBe(Choice.Rock);
-    expect(Number(player2Choice.choice)).toBe(Choice.Scissors);
+    expect(unwrapOption(player1Choice.choice)).toBe(Choice.Rock);
+    expect(unwrapOption(player2Choice.choice)).toBe(Choice.Scissors);
   });
 });

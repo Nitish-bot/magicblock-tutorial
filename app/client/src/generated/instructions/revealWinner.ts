@@ -76,10 +76,10 @@ export type RevealWinnerInstruction<
         ? WritableAccount<TAccountGame>
         : TAccountGame,
       TAccountPlayer1Choice extends string
-        ? ReadonlyAccount<TAccountPlayer1Choice>
+        ? WritableAccount<TAccountPlayer1Choice>
         : TAccountPlayer1Choice,
       TAccountPlayer2Choice extends string
-        ? ReadonlyAccount<TAccountPlayer2Choice>
+        ? WritableAccount<TAccountPlayer2Choice>
         : TAccountPlayer2Choice,
       TAccountPermissionGame extends string
         ? WritableAccount<TAccountPermissionGame>
@@ -202,8 +202,8 @@ export function getRevealWinnerInstruction<
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    player1Choice: { value: input.player1Choice ?? null, isWritable: false },
-    player2Choice: { value: input.player2Choice ?? null, isWritable: false },
+    player1Choice: { value: input.player1Choice ?? null, isWritable: true },
+    player2Choice: { value: input.player2Choice ?? null, isWritable: true },
     permissionGame: { value: input.permissionGame ?? null, isWritable: true },
     permissionP1: { value: input.permissionP1 ?? null, isWritable: true },
     permissionP2: { value: input.permissionP2 ?? null, isWritable: true },

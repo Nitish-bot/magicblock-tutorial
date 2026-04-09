@@ -23,6 +23,7 @@ pub struct RevealWinner<'info> {
     pub game: Account<'info, Game>,
 
     #[account(
+        mut,
         seeds = [PLAYER_CHOICE_SEED, &game.player1.key().to_bytes(), &game.game_id.to_le_bytes()],
         bump,
         constraint = player1_choice.choice.is_some() @ GameError::RevealTooEarly
@@ -30,6 +31,7 @@ pub struct RevealWinner<'info> {
     pub player1_choice: Account<'info, PlayerChoice>,
 
     #[account(
+        mut,
         seeds = [PLAYER_CHOICE_SEED, &game.player2.unwrap().key().to_bytes(), &game.game_id.to_le_bytes()],
         bump,
         constraint = player2_choice.choice.is_some() @ GameError::RevealTooEarly
@@ -126,6 +128,8 @@ pub fn handler(ctx: Context<RevealWinner>) -> Result<()> {
         .invoke_signed(player2_seeds)?;
     
     game.exit(&crate::ID)?;
+    player1_choice.exit(&crate::ID)?;
+    player2_choice.exit(&crate::ID)?;
     
     commit_and_undelegate_accounts(
         &ctx.accounts.payer,
