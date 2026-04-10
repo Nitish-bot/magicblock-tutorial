@@ -29,7 +29,7 @@
     "baseUrl": ".",
     "types": ["node"],
     "paths": {
-      "@client/*": ["app/client/src/generated/*"]
+      "@/client/*": ["app/client/src/generated/*"]
     }
   }
 }

@@ -17,4 +17,4 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "bunx vitest run --testTimeout 1000000 tests/*.test.ts"
+test = "bunx vitest run --config vitest.config.ts tests/*.test.ts"

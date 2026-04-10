@@ -1,12 +1,13 @@
 {
   "name": "magicblock-tutorial",
+  "type": "module",
   "license": "ISC",
   "scripts": {
     "format:fix": "prettier tests/* --write",
     "format": "prettier tests/* --check",
     "generate": "codama run js",
     "setup": "anchor build && codama run js",
-    "test": "anchor test --provider devnet --skip-deploy"
+    "test:devnet": "anchor test --provider.cluster devnet --skip-deploy"
   },
   "dependencies": {
     "@magicblock-labs/ephemeral-rollups-kit": "0.8.0",
@@ -19,6 +20,7 @@
     "@codama/renderers-js": "^2.0.3",
     "@types/node": "^24.7.2",
     "codama": "^1.5.1",
+    "dotenv": "^17.4.1",
     "prettier": "^3.8.1",
     "vitest": "^3.2.4"
   }

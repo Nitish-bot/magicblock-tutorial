@@ -1,16 +1,27 @@
 #!/bin/bash
 
-# Configuration
-AT_ROOT="Anchor.toml"
-LOG_MB="/dev/null"
-LOG_EV="/dev/null"
+# Usage:
+#   ./local_test.sh            # run in current directory (must contain Anchor.toml)
+#   ./local_test.sh week1      # run in provided directory
+
+TARGET_DIR="${1:-.}"
+
+if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "Error: target directory '$TARGET_DIR' does not exist."
+    exit 1
+fi
+
+AT_ROOT="$TARGET_DIR/Anchor.toml"
+if [[ ! -f "$AT_ROOT" ]]; then
+    echo "Error: Anchor.toml not found in '$TARGET_DIR'."
+    echo "Usage: ./local_test.sh [path-to-project-dir]"
+    exit 1
+fi
+
+cd "$TARGET_DIR" || exit 1
 
 # Setup Logging Redirection
 if [[ "$LOG" == "ON" ]]; then
-    if [[ ! -f "$AT_ROOT" ]]; then
-        echo "Error: Anchor.toml not found. Execute from project root."
-        exit 1
-    fi
     echo "✅ Logging enabled. Writing to .log files."
     OUT_MB="mb-validator.log"
     OUT_EV="ephemeral-validator.log"
@@ -62,10 +73,10 @@ echo "All validators are healthy!"
 # 4. Run Anchor tests
 echo "Running Anchor tests..."
 CLUSTER=localnet \
-EPHEMERAL_URL=http://127.0.0.1:7799 \
-EPHEMERAL_WS_URL=ws://127.0.0.1:7800 \
-BASE_URL=http://127.0.0.1:8899 \
-BASE_WS_URL=ws://127.0.0.1:8900 \
+EPHEMERAL_ENDPOINT=http://127.0.0.1:7799 \
+EPHEMERAL_WS_ENDPOINT=ws://127.0.0.1:7800 \
+BASE_ENDPOINT=http://127.0.0.1:8899 \
+BASE_WS_ENDPOINT=ws://127.0.0.1:8900 \
 ER_VALIDATOR=mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev \
 anchor test --provider.cluster localnet --skip-local-validator
 

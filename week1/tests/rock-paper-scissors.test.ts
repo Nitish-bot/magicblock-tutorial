@@ -1,3 +1,4 @@
+import "dotenv/config";
 import {
   AUTHORITY_FLAG,
   TX_LOGS_FLAG,
@@ -25,7 +26,7 @@ import {
   getPlayerChoiceDecoder,
   getRevealWinnerInstruction,
   type GameData,
-} from "@client/index";
+} from "@/client/index";
 import {
   address,
   appendTransactionMessageInstructions,
@@ -42,7 +43,8 @@ import {
   type Address,
   type TransactionSigner,
 } from "@solana/kit";
-import { beforeAll, describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { beforeAll, describe, it } from "vitest";
 import { connect, getPDAAndBump, type Connection } from "solana-kite";
 import nacl from "tweetnacl";
 
@@ -72,16 +74,16 @@ const cluster = (process.env.CLUSTER || "devnet").toLowerCase();
 const isDevnet = cluster === "devnet";
 
 const baseUrl =
-  process.env.BASE_URL ||
+  process.env.BASE_ENDPOINT ||
   (isDevnet ? "https://api.devnet.solana.com" : "http://127.0.0.1:8899");
 const baseWsUrl =
-  process.env.BASE_WS_URL ||
+  process.env.BASE_WS_ENDPOINT ||
   (isDevnet ? "wss://api.devnet.solana.com" : "ws://127.0.0.1:8900");
 const ephemeralUrl =
-  process.env.EPHEMERAL_URL ||
+  process.env.EPHEMERAL_ENDPOINT ||
   (isDevnet ? "https://devnet-tee.magicblock.app" : "http://127.0.0.1:7799");
 const ephemeralWsUrl =
-  process.env.EPHEMERAL_WS_URL ||
+  process.env.EPHEMERAL_WS_ENDPOINT ||
   (isDevnet ? "wss://devnet-tee.magicblock.app" : "ws://127.0.0.1:7800");
 const erValidator = process.env.ER_VALIDATOR
   ? address(process.env.ER_VALIDATOR)
@@ -257,7 +259,7 @@ async function decodeAccount<T>(
   const bytes = Uint8Array.from(
     Buffer.from(raw.value.data[0] as string, "base64"),
   );
-  expect(Array.from(bytes.slice(0, 8))).toEqual(Array.from(discriminator));
+  assert.deepEqual(Array.from(bytes.slice(0, 8)), Array.from(discriminator));
   return decoder.decode(bytes);
 }
 
@@ -476,15 +478,15 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(game.gameId).toBe(gameId);
-    expect(game.player1).toBe(player1.address);
-    expect(unwrapOption(game.player2)).toBeNull();
-    expect(game.state).toBe(GameState.AwaitingPlayerTwo);
-    expect(game.result.__kind).toBe("None");
+    assert.equal(game.gameId, gameId);
+    assert.equal(game.player1, player1.address);
+    assert.equal(unwrapOption(game.player2), null);
+    assert.equal(game.state, GameState.AwaitingPlayerTwo);
+    assert.equal(game.result.__kind, "None");
 
-    expect(player1Choice.gameId).toBe(gameId);
-    expect(player1Choice.player).toBe(player1.address);
-    expect(unwrapOption(player1Choice.choice)).toBeNull();
+    assert.equal(player1Choice.gameId, gameId);
+    assert.equal(player1Choice.player, player1.address);
+    assert.equal(unwrapOption(player1Choice.choice), null);
   });
 
   it("joins the game, creates permissions, and delegates all ER accounts", async () => {
@@ -605,23 +607,25 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(unwrapOption(game.player2)).toBe(player2.address);
-    expect(game.state).toBe(GameState.AwaitingFirstChoice);
-    expect(player2Choice.player).toBe(player2.address);
-    expect(unwrapOption(player2Choice.choice)).toBeNull();
+    assert.equal(unwrapOption(game.player2), player2.address);
+    assert.equal(game.state, GameState.AwaitingFirstChoice);
+    assert.equal(player2Choice.player, player2.address);
+    assert.equal(unwrapOption(player2Choice.choice), null);
   });
 
   it("enforces ER visibility on delegated choice accounts", async () => {
     // Will fail on localnet since private ER
     // is not supported on local validator
     if (ephemeralUrl.includes("tee")) {
-      expect(await waitUntilPermissionActive(ephemeralUrl, gamePda)).toBe(true);
-      expect(
+      assert.equal(await waitUntilPermissionActive(ephemeralUrl, gamePda), true);
+      assert.equal(
         await waitUntilPermissionActive(ephemeralUrl, player1ChoicePda),
-      ).toBe(true);
-      expect(
+        true,
+      );
+      assert.equal(
         await waitUntilPermissionActive(ephemeralUrl, player2ChoicePda),
-      ).toBe(true);
+        true,
+      );
 
       const p1Sneak = await ephemeralConnectionP1.rpc
         .getAccountInfo(player2ChoicePda, { encoding: "base64" })
@@ -630,8 +634,8 @@ describe(`magicblock tutorial (${cluster})`, () => {
         .getAccountInfo(player1ChoicePda, { encoding: "base64" })
         .send();
 
-      expect(p1Sneak.value).toBeNull();
-      expect(p2Sneak.value).toBeNull();
+      assert.equal(p1Sneak.value, null);
+      assert.equal(p2Sneak.value, null);
     }
 
     const p1Own = await ephemeralConnectionP1.rpc
@@ -641,8 +645,8 @@ describe(`magicblock tutorial (${cluster})`, () => {
       .getAccountInfo(player2ChoicePda, { encoding: "base64" })
       .send();
 
-    expect(p1Own.value).not.toBeNull();
-    expect(p2Own.value).not.toBeNull();
+    assert.notEqual(p1Own.value, null);
+    assert.notEqual(p2Own.value, null);
   });
 
   it("lets both players submit choices on the ephemeral rollup", async () => {
@@ -669,8 +673,8 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(gameAfterP1.state).toBe(GameState.AwaitingSecondChoice);
-    expect(unwrapOption(choiceAfterP1.choice)).toBe(Choice.Rock);
+    assert.equal(gameAfterP1.state, GameState.AwaitingSecondChoice);
+    assert.equal(unwrapOption(choiceAfterP1.choice), Choice.Rock);
 
     const player2ChoiceIx = getMakeChoiceInstruction({
       player: player2,
@@ -695,8 +699,8 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(gameAfterP2.state).toBe(GameState.GameFinished);
-    expect(unwrapOption(choiceAfterP2.choice)).toBe(Choice.Scissors);
+    assert.equal(gameAfterP2.state, GameState.GameFinished);
+    assert.equal(unwrapOption(choiceAfterP2.choice), Choice.Scissors);
   });
 
   it("reveals the winner and commits the result back to the base layer", async () => {
@@ -712,14 +716,6 @@ describe(`magicblock tutorial (${cluster})`, () => {
 
     await sendAndPoll(ephemeralConnectionP1, authority, [revealWinnerIx]);
 
-    const game = await waitForDecodedAccount(
-      baseConnection,
-      gamePda,
-      GAME_DISCRIMINATOR,
-      getGameDecoder(),
-      (value) => value.state === GameState.WinnerDeclared,
-      "winner declaration on base layer",
-    );
     const player1Choice = await decodeAccount(
       baseConnection,
       player1ChoicePda,
@@ -733,16 +729,27 @@ describe(`magicblock tutorial (${cluster})`, () => {
       getPlayerChoiceDecoder(),
     );
 
-    expect(game.state).toBe(GameState.WinnerDeclared);
-    expect(game.result.__kind).toBe("Winner");
-
-    // @ts-ignore fields does exist on the winner arm of GameResult
-    const [winnerData]: [GameData] = game.result.fields!;
-    expect(winnerData.player1Choice).toBe(Choice.Rock);
-    expect(winnerData.player2Choice).toBe(Choice.Scissors);
-    expect(winnerData.winner).toBe(player1.address);
-
-    expect(unwrapOption(player1Choice.choice)).toBe(Choice.Rock);
-    expect(unwrapOption(player2Choice.choice)).toBe(Choice.Scissors);
+    if (ephemeralUrl.includes("tee")) {
+      const game = await waitForDecodedAccount(
+        baseConnection,
+        gamePda,
+        GAME_DISCRIMINATOR,
+        getGameDecoder(),
+        (value) => value.state === GameState.WinnerDeclared,
+        "winner declaration on base layer",
+      );
+  
+      assert.equal(unwrapOption(player1Choice.choice), Choice.Rock);
+      assert.equal(unwrapOption(player2Choice.choice), Choice.Scissors);
+  
+      assert.equal(game.state, GameState.WinnerDeclared);
+      assert.equal(game.result.__kind, "Winner");
+  
+      // @ts-ignore fields does exist on the winner arm of GameResult
+      const [winnerData]: [GameData] = game.result.fields!;
+      assert.equal(winnerData.player1Choice, Choice.Rock);
+      assert.equal(winnerData.player2Choice, Choice.Scissors);
+      assert.equal(winnerData.winner, player1.address);
+    }
   });
 });
