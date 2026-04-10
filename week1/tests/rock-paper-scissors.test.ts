@@ -25,20 +25,13 @@ import {
   getMakeChoiceInstruction,
   getPlayerChoiceDecoder,
   getRevealWinnerInstruction,
+  type Game,
   type GameData,
 } from "@/client/index";
 import {
   address,
-  appendTransactionMessageInstructions,
   createKeyPairSignerFromBytes,
-  createTransactionMessage,
-  getBase64EncodedWireTransaction,
-  getSignatureFromTransaction,
   lamports,
-  pipe,
-  setTransactionMessageFeePayerSigner,
-  setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
   unwrapOption,
   type Address,
   type TransactionSigner,
@@ -49,6 +42,7 @@ import { connect, getPDAAndBump, type Connection } from "solana-kite";
 import nacl from "tweetnacl";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Not used but really helpful for debugging
 const stringify = (object: unknown) => {
   const bigIntReplacer = (key: string, value: unknown) =>
     typeof value === "bigint" ? value.toString() : value;
@@ -67,8 +61,7 @@ const logAccountMap = (
 };
 
 const LAMPORTS_PER_SOL = 1_000_000_000n;
-const AIRDROP_AMOUNT = lamports(2n * LAMPORTS_PER_SOL);
-const MINIMUM_BALANCE = lamports(LAMPORTS_PER_SOL / 2n);
+const MINIMUM_BALANCE = lamports(LAMPORTS_PER_SOL / 10n);
 
 const cluster = (process.env.CLUSTER || "devnet").toLowerCase();
 const isDevnet = cluster === "devnet";
@@ -94,152 +87,13 @@ const erValidator = process.env.ER_VALIDATOR
 const parseKeypairBytes = (value: string) =>
   Uint8Array.from(JSON.parse(value) as number[]);
 
-async function createPlayerSigner(
-  connection: Connection,
-  envVar: string,
-): Promise<{ signer: TransactionSigner; bytes?: Uint8Array }> {
-  const encoded = process.env[envVar];
-  if (encoded) {
-    const bytes = parseKeypairBytes(encoded);
-    return {
-      signer: await createKeyPairSignerFromBytes(bytes),
-      bytes,
-    };
-  }
-
-  if (isDevnet) {
-    throw new Error(`${envVar} is required for devnet tests.`);
-  }
-
-  return { signer: await connection.createWallet() };
-}
-
-async function createAuthoritySigner(
-  connection: Connection,
-): Promise<{ signer: TransactionSigner; bytes?: Uint8Array }> {
-  const encoded = process.env.AUTHORITY_BYTES;
-  if (encoded) {
-    const bytes = parseKeypairBytes(encoded);
-    return {
-      signer: await createKeyPairSignerFromBytes(bytes),
-      bytes,
-    };
-  }
-
-  if (isDevnet) {
-    const signer = await connection.loadWalletFromFile();
-    return { signer };
-  }
-
-  return { signer: await connection.createWallet() };
-}
-
 async function ensureFunded(connection: Connection, signer: TransactionSigner) {
   await connection.airdropIfRequired(
     signer.address,
-    AIRDROP_AMOUNT,
+    lamports(LAMPORTS_PER_SOL),
     MINIMUM_BALANCE,
     "confirmed",
   );
-}
-
-async function sendAndPoll(
-  conn: Connection,
-  feePayer: TransactionSigner,
-  instructions: Parameters<
-    Connection["sendTransactionFromInstructions"]
-  >[0]["instructions"],
-  options?: { skipPreflight?: boolean; maxRetries?: number },
-) {
-  const maxRetries = options?.maxRetries ?? 3;
-  const skipPreflight = options?.skipPreflight ?? true;
-
-  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
-    const { value: latestBlockhash } = await conn.rpc
-      .getLatestBlockhash()
-      .send();
-
-    const txMsg = pipe(
-      createTransactionMessage({ version: 0 }),
-      (tx) => setTransactionMessageFeePayerSigner(feePayer, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-      (tx) => appendTransactionMessageInstructions(instructions, tx),
-    );
-
-    const signedTx = await signTransactionMessageWithSigners(txMsg);
-    const signature = getSignatureFromTransaction(signedTx);
-
-    try {
-      await conn.rpc
-        .sendTransaction(getBase64EncodedWireTransaction(signedTx), {
-          encoding: "base64",
-          skipPreflight,
-        })
-        .send();
-    } catch (error) {
-      const logs = await getFailureLogs(conn, signature);
-      throw new Error(
-        `Transaction send failed for ${signature}\n${stringify(error)}\nLogs:\n${logs.join(
-          "\n",
-        )}`,
-      );
-    }
-
-    for (let i = 0; i < 60; i += 1) {
-      const { value } = await conn.rpc.getSignatureStatuses([signature]).send();
-      const status = value[0];
-      if (status?.err) {
-        const logs = await getFailureLogs(conn, signature);
-        throw new Error(
-          `Transaction failed for ${signature}: ${stringify(status.err)}\nLogs:\n${logs.join(
-            "\n",
-          )}`,
-        );
-      }
-      if (
-        status?.confirmationStatus === "confirmed" ||
-        status?.confirmationStatus === "finalized"
-      ) {
-        return signature;
-      }
-      await sleep(500);
-    }
-
-    if (attempt < maxRetries - 1) {
-      await sleep(500);
-      continue;
-    }
-  }
-
-  throw new Error(
-    "Transaction confirmation timeout after retrying fresh blockhashes",
-  );
-}
-
-async function getFailureLogs(
-  conn: Connection,
-  signature: string,
-): Promise<string[]> {
-  try {
-    const logs = await conn.getLogs(signature);
-    if (logs.length > 0) {
-      return logs;
-    }
-  } catch {
-    // Fall through to transaction fetch.
-  }
-
-  try {
-    const tx = await conn.getTransaction(signature, "confirmed", 0);
-    const metaLogs = tx?.meta?.logMessages;
-    if (Array.isArray(metaLogs) && metaLogs.length > 0) {
-      return metaLogs;
-    }
-  } catch {
-    // Ignore and return fallback text below.
-  }
-
-  return ["<no logs available>"];
 }
 
 async function decodeAccount<T>(
@@ -261,30 +115,6 @@ async function decodeAccount<T>(
   );
   assert.deepEqual(Array.from(bytes.slice(0, 8)), Array.from(discriminator));
   return decoder.decode(bytes);
-}
-
-async function waitForDecodedAccount<T>(
-  connection: Connection,
-  account: Address,
-  discriminator: Uint8Array,
-  decoder: { decode(data: Uint8Array): T },
-  predicate: (value: T) => boolean,
-  label: string,
-): Promise<T> {
-  for (let i = 0; i < 30; i += 1) {
-    const decoded = await decodeAccount(
-      connection,
-      account,
-      discriminator,
-      decoder,
-    );
-    if (predicate(decoded)) {
-      return decoded;
-    }
-    await sleep(1_000);
-  }
-
-  throw new Error(`Timed out waiting for ${label}`);
 }
 
 describe(`magicblock tutorial (${cluster})`, () => {
@@ -312,16 +142,37 @@ describe(`magicblock tutorial (${cluster})`, () => {
     baseConnection = connect(baseUrl, baseWsUrl);
     ephemeralConnection = connect(ephemeralUrl, ephemeralWsUrl);
 
-    const authorityResult = await createAuthoritySigner(baseConnection);
-    authority = authorityResult.signer;
+    // On devnet we use provided keys; local runs can generate wallets on the fly.
+    const authorityBytesEncoded = process.env.AUTHORITY_BYTES;
+    if (authorityBytesEncoded) {
+      authority = await createKeyPairSignerFromBytes(
+        parseKeypairBytes(authorityBytesEncoded),
+      );
+    } else if (isDevnet) {
+      authority = await baseConnection.loadWalletFromFile();
+    } else {
+      authority = await baseConnection.createWallet();
+    }
 
-    const player1Result = await createPlayerSigner(baseConnection, "P1B");
-    player1 = player1Result.signer;
-    player1Bytes = player1Result.bytes;
+    const p1Encoded = process.env.P1B;
+    if (p1Encoded) {
+      player1Bytes = parseKeypairBytes(p1Encoded);
+      player1 = await createKeyPairSignerFromBytes(player1Bytes);
+    } else if (isDevnet) {
+      throw new Error("P1B is required for devnet tests.");
+    } else {
+      player1 = await baseConnection.createWallet();
+    }
 
-    const player2Result = await createPlayerSigner(baseConnection, "P2B");
-    player2 = player2Result.signer;
-    player2Bytes = player2Result.bytes;
+    const p2Encoded = process.env.P2B;
+    if (p2Encoded) {
+      player2Bytes = parseKeypairBytes(p2Encoded);
+      player2 = await createKeyPairSignerFromBytes(player2Bytes);
+    } else if (isDevnet) {
+      throw new Error("P2B is required for devnet tests.");
+    } else {
+      player2 = await baseConnection.createWallet();
+    }
 
     await ensureFunded(baseConnection, authority);
     await ensureFunded(baseConnection, player1);
@@ -453,17 +304,16 @@ describe(`magicblock tutorial (${cluster})`, () => {
       }),
     });
 
-    await sendAndPoll(
-      baseConnection,
-      player1,
-      [
+    await baseConnection.sendTransactionFromInstructions({
+      feePayer: player1,
+      instructions: [
         createGameIx,
         createPermissionIx,
         delegatePermissionIx,
         delegateChoiceIx,
       ],
-      { skipPreflight: false },
-    );
+      commitment: "confirmed",
+    });
 
     const game = await decodeAccount(
       baseConnection,
@@ -579,10 +429,9 @@ describe(`magicblock tutorial (${cluster})`, () => {
       }),
     });
 
-    await sendAndPoll(
-      baseConnection,
-      player2,
-      [
+    await baseConnection.sendTransactionFromInstructions({
+      feePayer: player2,
+      instructions: [
         joinGameIx,
         createGamePermissionIx,
         delegateGamePermissionIx,
@@ -591,8 +440,8 @@ describe(`magicblock tutorial (${cluster})`, () => {
         delegateChoicePermissionIx,
         delegateChoiceIx,
       ],
-      { skipPreflight: false },
-    );
+      commitment: "confirmed",
+    });
 
     const game = await decodeAccount(
       baseConnection,
@@ -658,7 +507,11 @@ describe(`magicblock tutorial (${cluster})`, () => {
       choice: Choice.Rock,
     });
 
-    await sendAndPoll(ephemeralConnectionP1, player1, [player1ChoiceIx]);
+    await ephemeralConnectionP1.sendTransactionFromInstructions({
+      feePayer: player1,
+      instructions: [player1ChoiceIx],
+      commitment: "confirmed",
+    });
 
     const gameAfterP1 = await decodeAccount(
       ephemeralConnectionP1,
@@ -684,7 +537,11 @@ describe(`magicblock tutorial (${cluster})`, () => {
       choice: Choice.Scissors,
     });
 
-    await sendAndPoll(ephemeralConnectionP2, player2, [player2ChoiceIx]);
+    await ephemeralConnectionP2.sendTransactionFromInstructions({
+      feePayer: player2,
+      instructions: [player2ChoiceIx],
+      commitment: "confirmed",
+    });
 
     const gameAfterP2 = await decodeAccount(
       ephemeralConnectionP2,
@@ -714,37 +571,52 @@ describe(`magicblock tutorial (${cluster})`, () => {
       permissionP2,
     });
 
-    await sendAndPoll(ephemeralConnectionP1, authority, [revealWinnerIx]);
-
-    const player1Choice = await decodeAccount(
-      baseConnection,
-      player1ChoicePda,
-      PLAYER_CHOICE_DISCRIMINATOR,
-      getPlayerChoiceDecoder(),
-    );
-    const player2Choice = await decodeAccount(
-      baseConnection,
-      player2ChoicePda,
-      PLAYER_CHOICE_DISCRIMINATOR,
-      getPlayerChoiceDecoder(),
-    );
+    await ephemeralConnectionP1.sendTransactionFromInstructions({
+      feePayer: authority,
+      instructions: [revealWinnerIx],
+      commitment: "confirmed",
+    });
 
     if (ephemeralUrl.includes("tee")) {
-      const game = await waitForDecodedAccount(
+      let game: Game | undefined;
+      // Give base layer a few seconds to receive the finalized winner state from ER.
+      for (let i = 0; i < 30; i += 1) {
+        const decoded = await decodeAccount(
+          baseConnection,
+          gamePda,
+          GAME_DISCRIMINATOR,
+          getGameDecoder(),
+        );
+        if (decoded.state === GameState.WinnerDeclared) {
+          game = decoded;
+          break;
+        }
+        await sleep(1_000);
+      }
+
+      if (!game) {
+        throw new Error("Timed out waiting for winner declaration on base layer");
+      }
+
+      const player1Choice = await decodeAccount(
         baseConnection,
-        gamePda,
-        GAME_DISCRIMINATOR,
-        getGameDecoder(),
-        (value) => value.state === GameState.WinnerDeclared,
-        "winner declaration on base layer",
+        player1ChoicePda,
+        PLAYER_CHOICE_DISCRIMINATOR,
+        getPlayerChoiceDecoder(),
       );
-  
+      const player2Choice = await decodeAccount(
+        baseConnection,
+        player2ChoicePda,
+        PLAYER_CHOICE_DISCRIMINATOR,
+        getPlayerChoiceDecoder(),
+      );
+
       assert.equal(unwrapOption(player1Choice.choice), Choice.Rock);
       assert.equal(unwrapOption(player2Choice.choice), Choice.Scissors);
-  
+
       assert.equal(game.state, GameState.WinnerDeclared);
       assert.equal(game.result.__kind, "Winner");
-  
+
       // @ts-ignore fields does exist on the winner arm of GameResult
       const [winnerData]: [GameData] = game.result.fields!;
       assert.equal(winnerData.player1Choice, Choice.Rock);
