@@ -27,6 +27,7 @@
     "noPropertyAccessFromIndexSignature": false,
 
     "baseUrl": ".",
+    "types": ["node"],
     "paths": {
       "@client/*": ["app/client/src/generated/*"]
     }

@@ -42,7 +42,7 @@ import {
   type Address,
   type TransactionSigner,
 } from "@solana/kit";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "vitest";
 import { connect, getPDAAndBump, type Connection } from "solana-kite";
 import nacl from "tweetnacl";
 
