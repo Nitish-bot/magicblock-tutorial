@@ -86,7 +86,7 @@ const ephemeralWsUrl =
 const erValidator = process.env.ER_VALIDATOR
   ? address(process.env.ER_VALIDATOR)
   : isDevnet
-    ? address("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA")
+    ? address("MTEWGuqxUpYZGFJQcp8tLN7x5v9BSeoFHYWQQ3n3xzo")
     : address("mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev");
 
 const parseKeypairBytes = (value: string) =>
