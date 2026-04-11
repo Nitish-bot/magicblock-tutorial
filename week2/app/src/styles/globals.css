@@ -1,0 +1,150 @@
+@import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Jura:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+@plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "rps-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(8% 0.025 280);
+  --color-base-200: oklch(12% 0.03 280);
+  --color-base-300: oklch(17% 0.04 280);
+  --color-base-content: oklch(94% 0.01 280);
+
+  --color-primary: oklch(58% 0.27 292);
+  --color-primary-content: oklch(98% 0.01 292);
+
+  --color-secondary: oklch(82% 0.17 200);
+  --color-secondary-content: oklch(15% 0.02 200);
+
+  --color-accent: oklch(48% 0.24 292);
+  --color-accent-content: oklch(98% 0.01 292);
+
+  --color-neutral: oklch(22% 0.03 280);
+  --color-neutral-content: oklch(90% 0.01 280);
+
+  --color-info: oklch(72% 0.15 220);
+  --color-info-content: oklch(98% 0.01 220);
+
+  --color-success: oklch(83% 0.27 140);
+  --color-success-content: oklch(15% 0.05 140);
+
+  --color-warning: oklch(80% 0.18 80);
+  --color-warning-content: oklch(20% 0.05 80);
+
+  --color-error: oklch(62% 0.25 28);
+  --color-error-content: oklch(98% 0.01 28);
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.75rem;
+  --border: 1px;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: 'Jura', sans-serif;
+    background-color: oklch(8% 0.025 280);
+    color: oklch(94% 0.01 280);
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Oxanium', sans-serif;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@utility font-display {
+  font-family: 'Oxanium', sans-serif;
+}
+
+@utility text-muted {
+  color: oklch(94% 0.01 280 / 0.45);
+}
+
+@utility glass-surface {
+  background: oklch(12% 0.03 280 / 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(94% 0.01 280 / 0.07);
+}
+
+@utility glow-primary {
+  box-shadow:
+    0 0 20px oklch(58% 0.27 292 / 0.4),
+    0 0 50px oklch(58% 0.27 292 / 0.15);
+}
+
+@utility glow-success {
+  box-shadow:
+    0 0 20px oklch(83% 0.27 140 / 0.4),
+    0 0 50px oklch(83% 0.27 140 / 0.15);
+}
+
+@utility glow-error {
+  box-shadow:
+    0 0 20px oklch(62% 0.25 28 / 0.4),
+    0 0 50px oklch(62% 0.25 28 / 0.15);
+}
+
+@utility glow-warning {
+  box-shadow:
+    0 0 20px oklch(80% 0.18 80 / 0.4),
+    0 0 50px oklch(80% 0.18 80 / 0.15);
+}
+
+@utility glow-secondary {
+  box-shadow:
+    0 0 20px oklch(82% 0.17 200 / 0.4),
+    0 0 50px oklch(82% 0.17 200 / 0.15);
+}
+
+@keyframes orbit-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@utility anim-orbit-pulse {
+  animation: orbit-pulse 2s ease-in-out infinite;
+}
+
+@utility anim-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(17% 0.04 280) 0%,
+    oklch(30% 0.05 280) 50%,
+    oklch(17% 0.04 280) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
